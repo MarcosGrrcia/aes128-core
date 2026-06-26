@@ -1,0 +1,104 @@
+[2026-06-21 21:21:59 UTC] vlib work && vlog '-timescale' '1ns/1ns' +incdir+$RIVIERA_HOME/vlib/uvm-1.2/src -l uvm_1_2 -err VCP2947 W9 -err VCP2974 W9 -err VCP3003 W9 -err VCP5417 W9 -err VCP6120 W9 -err VCP7862 W9 -err VCP2129 W9 design.sv testbench.sv  && vsim -c -do "vsim +access+r +UVM_TESTNAME=aes_random_test; run -all; exit"  
+VSIMSA: Configuration file changed: `/home/runner/library.cfg'
+ALIB: Library "work" attached.
+work = ./work/work.lib
+MESSAGE_SP VCP2124 "Package uvm_pkg found in library uvm_1_2."
+MESSAGE "Unit top modules: aes128_uvm_tb."
+SUCCESS "Compile success 0 Errors 0 Warnings  Analysis time: 6[s]."
+done
+# Aldec, Inc. Riviera-PRO version 2025.04.139.9738 built for Linux64 on May 30, 2025.
+# HDL, SystemC, and Assertions simulator, debugger, and design environment.
+# (c) 1999-2025 Aldec, Inc. All rights reserved.
+# ELBREAD: Elaboration process.
+# ELBREAD: Warning: ELBREAD_0049 The "uvm_pkg" design unit does not have a time unit/precision defined but other design units do.
+# ELBREAD: Elaboration time 0.8 [s].
+# KERNEL: Main thread initiated.
+# KERNEL: Kernel process initialization phase.
+# ELAB2: Elaboration final pass...
+# KERNEL: PLI/VHPI kernel's engine initialization done.
+# PLI: Loading library '/usr/share/Riviera-PRO/bin/libsystf.so'
+# ELAB2: Create instances ...
+# KERNEL: Info: Loading library:  /usr/share/Riviera-PRO/bin/uvm_1_2_dpi
+# KERNEL: Time resolution set to 1ps.
+# ELAB2: Create instances complete.
+# SLP: Started
+# SLP: Elaboration phase ...
+# SLP: Elaboration phase ... done : 0.1 [s]
+# SLP: Generation phase ...
+# SLP: Generation phase ... done : 0.1 [s]
+# SLP: Finished : 0.1 [s]
+# SLP: 0 primitives and 36 (87.80%) other processes in SLP
+# SLP: 108 (0.36%) signals in SLP and 19 (0.06%) interface signals
+# ELAB2: Elaboration final pass complete - time: 2.5 [s].
+# KERNEL: SLP loading done - time: 0.0 [s].
+# KERNEL: Warning: You are using the Riviera-PRO EDU Edition. The performance of simulation is reduced.
+# KERNEL: Warning: Contact Aldec for available upgrade options - sales@aldec.com.
+# KERNEL: SLP simulation initialization done - time: 0.0 [s].
+# KERNEL: Kernel process initialization done.
+# Allocation: Simulator allocated 29256 kB (elbread=2103 elab2=22386 kernel=4767 sdf=0)
+# KERNEL: UVM_INFO ./uvm-1.2/src/base/uvm_root.svh(392) @ 0: reporter [UVM/RELNOTES] 
+# KERNEL: ----------------------------------------------------------------
+# KERNEL: UVM-1.2
+# KERNEL: (C) 2007-2014 Mentor Graphics Corporation
+# KERNEL: (C) 2007-2014 Cadence Design Systems, Inc.
+# KERNEL: (C) 2006-2014 Synopsys, Inc.
+# KERNEL: (C) 2011-2013 Cypress Semiconductor Corp.
+# KERNEL: (C) 2013-2014 NVIDIA Corporation
+# KERNEL: ----------------------------------------------------------------
+# KERNEL: 
+# KERNEL:   ***********       IMPORTANT RELEASE NOTES         ************
+# KERNEL: 
+# KERNEL:   You are using a version of the UVM library that has been compiled
+# KERNEL:   with `UVM_NO_DEPRECATED undefined.
+# KERNEL:   See http://www.eda.org/svdb/view.php?id=3313 for more details.
+# KERNEL: 
+# KERNEL:   You are using a version of the UVM library that has been compiled
+# KERNEL:   with `UVM_OBJECT_DO_NOT_NEED_CONSTRUCTOR undefined.
+# KERNEL:   See http://www.eda.org/svdb/view.php?id=3770 for more details.
+# KERNEL: 
+# KERNEL:       (Specify +UVM_NO_RELNOTES to turn off this notice)
+# KERNEL: 
+# KERNEL: ASDB file was created in location /home/runner/dataset.asdb
+# KERNEL: UVM_INFO @ 0: reporter [RNTST] Running test aes_random_test...
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 145000: uvm_test_top.env.scoreboard [SCB] PASS cipher=a0e3cea841ad5a897eebaf47af573cbe
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 275000: uvm_test_top.env.scoreboard [SCB] PASS cipher=10476da6a56dd7c4199b2d5be73972b5
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 405000: uvm_test_top.env.scoreboard [SCB] PASS cipher=c6686135ea98727a6df40cf6975389d9
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 535000: uvm_test_top.env.scoreboard [SCB] PASS cipher=5193bcde779163884a0c318a949a3dbe
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 665000: uvm_test_top.env.scoreboard [SCB] PASS cipher=94d05d79ecc9ae34c6b0ce23e322d189
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 795000: uvm_test_top.env.scoreboard [SCB] PASS cipher=a1fddc18ccee91a17144a31f6ef3daed
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 925000: uvm_test_top.env.scoreboard [SCB] PASS cipher=fb4db06bf84ee62960267cd162233a94
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1055000: uvm_test_top.env.scoreboard [SCB] PASS cipher=58d7a0278076ec5c422d07f00118455b
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1185000: uvm_test_top.env.scoreboard [SCB] PASS cipher=a99c882cc30fafefb355a5414aa168fd
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1315000: uvm_test_top.env.scoreboard [SCB] PASS cipher=db258cc1c411d57c49fd873a159a254b
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1445000: uvm_test_top.env.scoreboard [SCB] PASS cipher=2e18f73122be1b40bdf95fff867782a3
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1575000: uvm_test_top.env.scoreboard [SCB] PASS cipher=75d5eb72637a1044cdf2e7b90bd576ca
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1705000: uvm_test_top.env.scoreboard [SCB] PASS cipher=d4611b365473a5e53afcce5e7342ef40
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1835000: uvm_test_top.env.scoreboard [SCB] PASS cipher=35a91fac91546612d35397e6cf6c28c2
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 1965000: uvm_test_top.env.scoreboard [SCB] PASS cipher=c2df1305446f5194b791414ad5018fbd
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 2095000: uvm_test_top.env.scoreboard [SCB] PASS cipher=b6625d38a558eb5a953ac93a89a9aab0
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 2225000: uvm_test_top.env.scoreboard [SCB] PASS cipher=c10e14ea2f7952d11437da2d86885ba0
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 2355000: uvm_test_top.env.scoreboard [SCB] PASS cipher=602a5247959706f2a9df654e247af782
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 2485000: uvm_test_top.env.scoreboard [SCB] PASS cipher=c5d6df11ed754c36b0c26609a48c6568
+# KERNEL: UVM_INFO /home/runner/testbench.sv(275) @ 2615000: uvm_test_top.env.scoreboard [SCB] PASS cipher=3c39be29bbfca7f749435753209bf7de
+# KERNEL: UVM_INFO ./uvm-1.2/src/base/uvm_objection.svh(1271) @ 2615000: reporter [TEST_DONE] 'run' phase is ready to proceed to the 'extract' phase
+# KERNEL: UVM_INFO /home/runner/testbench.sv(286) @ 2615000: uvm_test_top.env.scoreboard [SCB] DONE: 20 passed, 0 failed
+# KERNEL: UVM_INFO ./uvm-1.2/src/base/uvm_report_server.svh(869) @ 2615000: reporter [UVM/REPORT/SERVER] 
+# KERNEL: --- UVM Report Summary ---
+# KERNEL: 
+# KERNEL: ** Report counts by severity
+# KERNEL: UVM_INFO :   24
+# KERNEL: UVM_WARNING :    0
+# KERNEL: UVM_ERROR :    0
+# KERNEL: UVM_FATAL :    0
+# KERNEL: ** Report counts by id
+# KERNEL: [RNTST]     1
+# KERNEL: [SCB]    21
+# KERNEL: [TEST_DONE]     1
+# KERNEL: [UVM/RELNOTES]     1
+# KERNEL: 
+# RUNTIME: Info: RUNTIME_0068 uvm_root.svh (521): $finish called.
+# KERNEL: Time: 2615 ns,  Iteration: 62,  Instance: /aes128_uvm_tb,  Process: @INITIAL#443_2@.
+# KERNEL: stopped at time: 2615 ns
+# VSIM: Simulation has finished. There are no more test vectors to simulate.
+# VSIM: Simulation has finished.
+Done

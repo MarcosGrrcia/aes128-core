@@ -1,0 +1,13 @@
+# Simulator / synthesis build artifacts
+obj_dir/
+work/
+build/
+*.vcd
+*.log
+*.dat
+# but keep the committed UVM proof logs under docs/
+!docs/*.log
+
+# Editor
+*.swp
+*.history
