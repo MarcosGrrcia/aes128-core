@@ -11,7 +11,6 @@ class aes_scoreboard extends uvm_scoreboard;
     ap_imp = new("ap_imp", this);
   endfunction
 
-  /* AES CODE BEGIN check */
   function void write(aes_seq_item t);
     bit [127:0] expected = aes128_model(t.key, t.plaintext);
     if (t.ciphertext === expected) begin
@@ -23,7 +22,6 @@ class aes_scoreboard extends uvm_scoreboard;
                                   expected, t.ciphertext))
     end
   endfunction
-  /* AES CODE END check */
 
   function void report_phase(uvm_phase phase);
     `uvm_info("SCB", $sformatf("DONE: %0d passed, %0d failed",

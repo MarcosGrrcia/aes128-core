@@ -16,47 +16,39 @@ MixColumns, then AddRoundKey, and the last round skips MixColumns. After round
 ten the state is the ciphertext.
 
 ```text
-        plaintext           key
-            │                │
-            └─────> XOR <────┘     initial AddRoundKey:  state = plaintext XOR key
-                     │
-                     V
-              ┌─────────────┐
-        ┌────>│  state reg  │
-        │     └──────┬──────┘
-        │            │
-        │            V
-        │     ┌─────────────┐
-        │     │  SubBytes   │
-        │     └──────┬──────┘
-        │            │
-        │            V
-        │     ┌─────────────┐
-        │     │  ShiftRows  │
-        │     └──────┬──────┘
-        │            │
-        │            V
-        │     ┌─────────────┐
-        │     │  MixColumns │       skipped on the last round
-        │     └──────┬──────┘
-        │            │
-        │            V
-        │     ┌─────────────┐      ┌──────────────┐
-        │     │ AddRoundKey │<─────│ key schedule │   round key (new each round)
-        │     └──────┬──────┘      └──────────────┘
-        │            │
-        │            ├──────────────> ciphertext      after round 10
-        │            │
-        └────────────┘   rounds 1-9: state loops back  (10 rounds, one per clock)
+   plaintext      key
+       |           |
+       +--> XOR <--+             initial AddRoundKey
+             |
+             v
+      +-------------+
+ +--->|  state reg  |
+ |    +-------------+
+ |           |
+ |           v
+ |       SubBytes
+ |           |
+ |           v
+ |       ShiftRows
+ |           |
+ |           v
+ |       MixColumns              (skipped in round 10)
+ |           |
+ |           v
+ |       AddRoundKey <-------- key schedule (next round key each clock)
+ |           |
+ |           +---------------> ciphertext (after round 10)
+ |           |
+ +-----------+  rounds 1-9
 ```
 
-This core is *iterative* (folded): it builds one round in hardware and runs the
-state register through it once per clock, reusing the same logic for all ten
-rounds. A block therefore takes 11 clocks (one to load the input and add the
-first key, then ten rounds), and only one block is in flight at a time. A single
-round counter (0 = idle) sequences the rounds, so there is no separate state
-machine, and the key schedule produces a fresh round key each clock, so the
-round keys are never stored.
+The core is iterative: there is one round's worth of hardware, and the state
+register goes through it once per clock. A block takes 11 clocks (one to load
+the input and add the first key, then ten rounds) and only one block is in
+flight at a time. We went this way instead of unrolling all ten rounds to keep
+the area down. Control is just a round counter (0 = idle) rather than a
+separate state machine, and the key schedule computes the next round key each
+clock, so round keys are never stored.
 
 Each block transform is its own small module:
 
@@ -130,54 +122,61 @@ Adding `--trace` writes `aes128_tb.vcd`, which opens in GTKWave.
 
 ## Verification
 
-The core is checked three ways, each independent of the design itself:
+There are three layers of checking.
 
-- **Known-answer vectors.** The self-checking testbench runs the core against
-  the published FIPS-197 and SP 800-38A vectors, with the expected ciphertexts
-  generated independently in OpenSSL.
-- **UVM.** A self-contained UVM environment (driver, monitor, scoreboard,
-  sequences). It comes two ways: `tb/uvm/` is the canonical layout (one class
-  per file), and `eda/aes128_uvm_tb.sv` is the same env concatenated into a
-  single file for EDA Playground. One environment serves
-  two tests, picked at run time with `+UVM_TESTNAME` so nothing is recompiled:
-  - `aes_directed_test` drives the published vectors.
-  - `aes_random_test` drives constrained-random key/plaintext blocks.
+**Known-answer tests.** `tb/aes128_tb.sv` (above) runs the FIPS-197 and
+SP 800-38A vectors. We double-checked the expected ciphertexts with OpenSSL.
 
-  Because random stimulus has no precomputed answer, the scoreboard predicts the
-  expected ciphertext with a behavioral AES-128 reference model (independent of
-  the RTL) and compares against the DUT. The directed test, where the inputs are
-  the known NIST vectors, validates the model and the DUT at the same time.
-- **Assertions.** `formal/aes128_props.sv` binds a set of SVA properties to the
-  core (done only after start, single-cycle done, ciphertext stability, clear
-  wipes state). They are checked during simulation and are written to hold under
-  a formal tool as well.
+**UVM.** `tb/uvm/` has a small UVM environment (driver, monitor, scoreboard,
+sequences), one class per file. `eda/aes128_uvm_tb.sv` is the same thing in a
+single file for EDA Playground. There are two tests, selected with
+`+UVM_TESTNAME`:
 
-Line coverage (Verilator `--coverage`) reaches 100% on the synthesizable RTL;
-the only unexercised lines are the testbench's own error and timeout branches.
+- `aes_directed_test` drives the published vectors.
+- `aes_random_test` drives 20 random key/plaintext blocks.
 
-On EDA Playground, paste `eda/aes128_uvm_tb.sv` into the testbench pane and
-`eda/aes128_rtl.sv` into the design pane, then set the `+UVM_TESTNAME` plusarg
-(`aes_directed_test` or `aes_random_test`) in the run-options field.
+Random inputs don't have a known answer, so the scoreboard computes the
+expected ciphertext with a behavioral AES-128 model written separately from the
+RTL (`tb/uvm/aes_ref_model.svh`). The directed test checks the model and the
+DUT against NIST at the same time.
 
-Both tests pass on Aldec Riviera-PRO (UVM 1.2). Trimmed output:
+**Assertions.** `formal/aes128_props.sv` binds SVA properties to the core:
+`done` only after a `start`, `done` is one cycle wide, `ciphertext` only
+changes on `done` or `clear`, and `clear` zeroes the output. They run during
+simulation with `--assert`, and are written so they should also work in a
+formal tool.
+
+Line coverage (Verilator `--coverage-line`) is 100% on the RTL. The only lines
+never hit are the testbench's own failure and timeout branches.
+
+To run the UVM tests on EDA Playground, paste `eda/aes128_rtl.sv` into the
+design pane and `eda/aes128_uvm_tb.sv` into the testbench pane, pick a UVM 1.2
+simulator, and add `+UVM_TESTNAME=aes_directed_test` (or `aes_random_test`) to
+the run options.
+
+Both tests pass on Aldec Riviera-PRO with UVM 1.2. From the logs:
 
 ```text
-[RNTST] Running test aes_directed_test...
+UVM_INFO @ 0: reporter [RNTST] Running test aes_directed_test...
 [SCB] PASS cipher=66e94bd4ef8a2c3b884cfa59ca342b2e
 [SCB] PASS cipher=bcbf217cb280cf30b2517052193ab979
 [SCB] PASS cipher=69c4e0d86a7b0430d8cdb78070b4c55a
 [SCB] PASS cipher=3ad77bb40d7a3660a89ecaf32466ef97
 [SCB] PASS cipher=f5d3d58503b9699de785895a96fdbaaf
-[SCB] DONE: 5 passed, 0 failed          UVM_ERROR: 0   UVM_FATAL: 0
+[SCB] DONE: 5 passed, 0 failed
+UVM_ERROR :    0
+UVM_FATAL :    0
 
-[RNTST] Running test aes_random_test...
+UVM_INFO @ 0: reporter [RNTST] Running test aes_random_test...
 [SCB] PASS cipher=a0e3cea841ad5a897eebaf47af573cbe
 [SCB] PASS cipher=10476da6a56dd7c4199b2d5be73972b5
-... 18 more random blocks ...
-[SCB] DONE: 20 passed, 0 failed         UVM_ERROR: 0   UVM_FATAL: 0
+...
+[SCB] DONE: 20 passed, 0 failed
+UVM_ERROR :    0
+UVM_FATAL :    0
 ```
 
-Full simulator logs: [docs/uvm_directed.log](docs/uvm_directed.log) and
+Full logs: [docs/uvm_directed.log](docs/uvm_directed.log),
 [docs/uvm_random.log](docs/uvm_random.log).
 
 ## Synthesis
@@ -191,19 +190,19 @@ sv2v rtl/*.sv > build/aes128.v
 yosys -p "read_verilog build/aes128.v; synth -top aes128_core -flatten; stat"
 ```
 
-With no target cell library this is a generic mapping: roughly 10.5K cells, 389
-registers (the three 128-bit datapath registers plus the round counter), and a
-longest path of 21 logic levels, which is one AES round, as expected for the
-folded datapath. This is a synthesizability check, not a placed-and-routed
-implementation.
+With no cell library this is just a generic gate mapping, but it gives a rough
+size: about 10.5K cells and 389 flops (state, key and ciphertext at 128 bits
+each, the 4-bit round counter, and `done`). The longest path is 21 logic
+levels, which is one full round. This only shows the design synthesizes; we
+haven't taken it through place and route.
 
 ## Limitations
 
-This is a functional core. Its runtime is data independent (always 11 cycles),
-so it does not leak timing, but it has no power or electromagnetic side-channel
-protection: the S-box is a plain table with no masking. It is meant for learning
-and functional use, not for deployment against an attacker with physical access.
-AES-128 only; no decryption.
+- Encryption only, AES-128 only. No decryption, no 192/256-bit keys.
+- Every block takes exactly 11 cycles regardless of the data, so there's no
+  timing leak, but there is no protection against power or EM side-channel
+  attacks (the S-box is a plain lookup table, no masking). Don't use it
+  anywhere an attacker could get physical access to the hardware.
 
 ## Reference
 

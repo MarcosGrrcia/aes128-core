@@ -17,7 +17,6 @@ class aes_monitor extends uvm_monitor;
   endfunction
 
   task run_phase(uvm_phase phase);
-    /* AES CODE BEGIN sample */
     forever begin
       @(posedge vif.clk);
       if (vif.done) begin
@@ -28,6 +27,5 @@ class aes_monitor extends uvm_monitor;
         ap.write(tr);
       end
     end
-    /* AES CODE END sample */
   endtask
 endclass : aes_monitor

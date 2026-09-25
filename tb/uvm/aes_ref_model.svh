@@ -1,6 +1,5 @@
 // Behavioral AES-128 reference model, the scoreboard oracle.
 // Package-scope params/functions, independent of the RTL.
-/* AES CODE BEGIN model */
 localparam bit [7:0] REF_SBOX [0:255] = '{
   8'h63, 8'h7c, 8'h77, 8'h7b, 8'hf2, 8'h6b, 8'h6f, 8'hc5,
   8'h30, 8'h01, 8'h67, 8'h2b, 8'hfe, 8'hd7, 8'hab, 8'h76,
@@ -110,4 +109,3 @@ function automatic bit [127:0] aes128_model(input bit [127:0] key, pt);
   for (int i = 0; i < 16; i++) ct[127 - 8*i -: 8] = s[i];
   return ct;
 endfunction
-/* AES CODE END model */

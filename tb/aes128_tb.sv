@@ -39,7 +39,7 @@ module aes128_tb;
   // Drive one block through the core and return its ciphertext.
   task automatic encrypt(input logic [127:0] k, pt, output logic [127:0] ct);
     @(negedge clk);
-    while (busy) @(negedge clk);     // honour the handshake: wait until ready
+    while (busy) @(negedge clk);     // wait for the core to be free
     key       = k;
     plaintext = pt;
     start     = 1'b1;

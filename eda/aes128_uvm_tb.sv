@@ -1,27 +1,17 @@
 `timescale 1ns/1ps
 
-// UVM testbench for aes128_core, a single-file mirror for EDA Playground. The
-// canonical one-class-per-file version is in tb/uvm/; this is the same
-// environment combined into one file for EDA Playground's editor.
-// One environment serves multiple tests, selected at run time with
-// +UVM_TESTNAME (no recompile):
+// UVM testbench for aes128_core, all in one file for EDA Playground. The
+// one-class-per-file version lives in tb/uvm/.
 //
-//   aes_directed_test  five known-answer vectors (FIPS-197 C.1, two SP 800-38A,
-//                      plus all-zero and all-ones)
-//   aes_random_test    constrained-random key/plaintext blocks
+// Pick the test with +UVM_TESTNAME:
+//   aes_directed_test  FIPS-197 C.1, two SP 800-38A vectors, all-zero, all-ones
+//   aes_random_test    20 random key/plaintext blocks
 //
-// The scoreboard does not carry golden values. It predicts the expected
-// ciphertext with a behavioral AES-128 reference model, so it can check any
-// stimulus, random included. The model is independent of the RTL and matches
-// the published vectors.
-//
-// Needs a UVM-capable simulator (Questa/VCS/Xcelium/Riviera).
-//
-// Blocks wrapped in /* AES CODE BEGIN x */ and /* AES CODE END x */ are the
-// AES-specific parts. Everything else is stock UVM skeleton.
+// The scoreboard has no hardcoded answers. It runs each block through a
+// behavioral AES model (separate from the RTL) and compares against the DUT.
+// Needs a simulator with UVM support (Questa, VCS, Xcelium, Riviera).
 
 interface aes_if (input logic clk);
-  /* AES CODE BEGIN pins */
   logic         rst;
   logic         clear;
   logic         start;
@@ -30,7 +20,6 @@ interface aes_if (input logic clk);
   logic [127:0] plaintext;
   logic [127:0] key;
   logic [127:0] ciphertext;
-  /* AES CODE END pins */
 endinterface : aes_if
 
 
@@ -41,7 +30,6 @@ package aes_uvm_pkg;
   // ------------------------------------------------------------------------
   // Behavioral AES-128 reference model (scoreboard oracle)
   // ------------------------------------------------------------------------
-  /* AES CODE BEGIN model */
   localparam bit [7:0] REF_SBOX [0:255] = '{
     8'h63, 8'h7c, 8'h77, 8'h7b, 8'hf2, 8'h6b, 8'h6f, 8'hc5,
     8'h30, 8'h01, 8'h67, 8'h2b, 8'hfe, 8'hd7, 8'hab, 8'h76,
@@ -151,17 +139,14 @@ package aes_uvm_pkg;
     for (int i = 0; i < 16; i++) ct[127 - 8*i -: 8] = s[i];
     return ct;
   endfunction
-  /* AES CODE END model */
 
   // ------------------------------------------------------------------------
   // Transaction
   // ------------------------------------------------------------------------
   class aes_seq_item extends uvm_sequence_item;
-    /* AES CODE BEGIN fields */
     rand bit [127:0] key;
     rand bit [127:0] plaintext;
     bit [127:0]      ciphertext;   // observed (filled by monitor)
-    /* AES CODE END fields */
 
     `uvm_object_utils(aes_seq_item)
 
@@ -201,7 +186,6 @@ package aes_uvm_pkg;
       end
     endtask
 
-    /* AES CODE BEGIN handshake */
     task drive(aes_seq_item tr);
       do @(posedge vif.clk); while (vif.rst || vif.busy);
       vif.plaintext <= tr.plaintext;
@@ -213,7 +197,6 @@ package aes_uvm_pkg;
       `uvm_info("DRV", $sformatf("key=%032h plain=%032h", tr.key, tr.plaintext),
                 UVM_HIGH)
     endtask
-    /* AES CODE END handshake */
   endclass : aes_driver
 
   // ------------------------------------------------------------------------
@@ -237,7 +220,6 @@ package aes_uvm_pkg;
     endfunction
 
     task run_phase(uvm_phase phase);
-      /* AES CODE BEGIN sample */
       forever begin
         @(posedge vif.clk);
         if (vif.done) begin
@@ -248,7 +230,6 @@ package aes_uvm_pkg;
           ap.write(tr);
         end
       end
-      /* AES CODE END sample */
     endtask
   endclass : aes_monitor
 
@@ -267,7 +248,6 @@ package aes_uvm_pkg;
       ap_imp = new("ap_imp", this);
     endfunction
 
-    /* AES CODE BEGIN check */
     function void write(aes_seq_item t);
       bit [127:0] expected = aes128_model(t.key, t.plaintext);
       if (t.ciphertext === expected) begin
@@ -279,7 +259,6 @@ package aes_uvm_pkg;
                                     expected, t.ciphertext))
       end
     endfunction
-    /* AES CODE END check */
 
     function void report_phase(uvm_phase phase);
       `uvm_info("SCB", $sformatf("DONE: %0d passed, %0d failed",
@@ -321,13 +300,12 @@ package aes_uvm_pkg;
   // ------------------------------------------------------------------------
   // Sequences
   // ------------------------------------------------------------------------
-  // Directed: fixed known-answer input pairs.
+  // Directed: the published known-answer inputs.
   class aes_directed_seq extends uvm_sequence #(aes_seq_item);
     `uvm_object_utils(aes_directed_seq)
     function new(string name = "aes_directed_seq"); super.new(name); endfunction
 
     task body();
-      /* AES CODE BEGIN vectors */
       bit [127:0] keys   [5];
       bit [127:0] plains [5];
       keys[0]   = '0;
@@ -347,19 +325,16 @@ package aes_uvm_pkg;
         item.plaintext = plains[i];
         finish_item(item);
       end
-      /* AES CODE END vectors */
     endtask
   endclass : aes_directed_seq
 
-  // Random: n blocks with random key and plaintext. Add constraints in the
-  // item (or an extended sequence) to bias coverage.
+  // Random: n blocks with a random key and plaintext.
   class aes_random_seq extends uvm_sequence #(aes_seq_item);
     `uvm_object_utils(aes_random_seq)
     int unsigned n = 20;
     function new(string name = "aes_random_seq"); super.new(name); endfunction
 
     task body();
-      /* AES CODE BEGIN random */
       repeat (n) begin
         aes_seq_item item = aes_seq_item::type_id::create("rnd");
         start_item(item);
@@ -367,7 +342,6 @@ package aes_uvm_pkg;
           `uvm_error("SEQ", "randomize failed")
         finish_item(item);
       end
-      /* AES CODE END random */
     endtask
   endclass : aes_random_seq
 

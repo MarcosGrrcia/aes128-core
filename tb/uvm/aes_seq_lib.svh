@@ -1,11 +1,9 @@
-// Sequence library: directed (known-answer) and constrained-random.
-// Directed: fixed known-answer input pairs.
+// Directed: the published known-answer inputs.
 class aes_directed_seq extends uvm_sequence #(aes_seq_item);
   `uvm_object_utils(aes_directed_seq)
   function new(string name = "aes_directed_seq"); super.new(name); endfunction
 
   task body();
-    /* AES CODE BEGIN vectors */
     bit [127:0] keys   [5];
     bit [127:0] plains [5];
     keys[0]   = '0;
@@ -25,19 +23,16 @@ class aes_directed_seq extends uvm_sequence #(aes_seq_item);
       item.plaintext = plains[i];
       finish_item(item);
     end
-    /* AES CODE END vectors */
   endtask
 endclass : aes_directed_seq
 
-// Random: n blocks with random key and plaintext. Add constraints in the
-// item (or an extended sequence) to bias coverage.
+// Random: n blocks with a random key and plaintext.
 class aes_random_seq extends uvm_sequence #(aes_seq_item);
   `uvm_object_utils(aes_random_seq)
   int unsigned n = 20;
   function new(string name = "aes_random_seq"); super.new(name); endfunction
 
   task body();
-    /* AES CODE BEGIN random */
     repeat (n) begin
       aes_seq_item item = aes_seq_item::type_id::create("rnd");
       start_item(item);
@@ -45,6 +40,5 @@ class aes_random_seq extends uvm_sequence #(aes_seq_item);
         `uvm_error("SEQ", "randomize failed")
       finish_item(item);
     end
-    /* AES CODE END random */
   endtask
 endclass : aes_random_seq

@@ -25,7 +25,6 @@ class aes_driver extends uvm_driver #(aes_seq_item);
     end
   endtask
 
-  /* AES CODE BEGIN handshake */
   task drive(aes_seq_item tr);
     do @(posedge vif.clk); while (vif.rst || vif.busy);
     vif.plaintext <= tr.plaintext;
@@ -37,5 +36,4 @@ class aes_driver extends uvm_driver #(aes_seq_item);
     `uvm_info("DRV", $sformatf("key=%032h plain=%032h", tr.key, tr.plaintext),
               UVM_HIGH)
   endtask
-  /* AES CODE END handshake */
 endclass : aes_driver

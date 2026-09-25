@@ -1,9 +1,8 @@
 `timescale 1ns/1ps
 
-// ShiftRows rotates row r of the state left by r bytes, so row 0 is unchanged,
-// row 1 moves left by one, and so on. Bytes are stored column-major, so byte i
-// sits at row i%4, column i/4. That makes it a fixed byte permutation, written
-// out below and grouped by output column.
+// ShiftRows: rotate row r of the state left by r bytes. The state is
+// column-major (byte i is row i%4, column i/4), so this is just a fixed
+// byte permutation.
 module aes_shift_rows (
   input  logic [127:0] state_in,
   output logic [127:0] state_out
