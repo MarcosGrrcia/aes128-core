@@ -26,50 +26,48 @@
 //   0x38  CT2      R   ciphertext[63:32]
 //   0x3C  CT3      R   ciphertext[31:0]
 //
-// Word 0 holds the most significant bits, so the bytes of a test vector go in
-// in the order they are written. Unmapped addresses read as 0 and ignore
-// writes. All responses are OKAY. WSTRB is honored on the KEY and PT
-// registers.
+// Word 0 is the most significant, so a test vector is written in the order
+// it's printed. The port decodes a 64-byte window; the interconnect decodes
+// the base address. 0x08 and 0x0C read as 0 and ignore writes. All responses
+// are OKAY. WSTRB is honored on the KEY and PT registers.
 //
 // Writes wait for both AWVALID and WVALID, which the AXI spec allows. One
-// transaction is handled at a time, so there are no outstanding transfers.
+// transaction is handled at a time.
 
-module aes128_axil #(
-  parameter int ADDR_WIDTH = 8
-) (
-  input  logic                  s_axi_aclk,
-  input  logic                  s_axi_aresetn,
+module aes128_axil (
+  input  logic        s_axi_aclk,
+  input  logic        s_axi_aresetn,
 
   // Write address channel
-  input  logic [ADDR_WIDTH-1:0] s_axi_awaddr,
-  input  logic [2:0]            s_axi_awprot,   // unused
-  input  logic                  s_axi_awvalid,
-  output logic                  s_axi_awready,
+  input  logic [5:0]  s_axi_awaddr,
+  input  logic [2:0]  s_axi_awprot,  // unused
+  input  logic        s_axi_awvalid,
+  output logic        s_axi_awready,
 
   // Write data channel
-  input  logic [31:0]           s_axi_wdata,
-  input  logic [3:0]            s_axi_wstrb,
-  input  logic                  s_axi_wvalid,
-  output logic                  s_axi_wready,
+  input  logic [31:0] s_axi_wdata,
+  input  logic [3:0]  s_axi_wstrb,
+  input  logic        s_axi_wvalid,
+  output logic        s_axi_wready,
 
   // Write response channel
-  output logic [1:0]            s_axi_bresp,
-  output logic                  s_axi_bvalid,
-  input  logic                  s_axi_bready,
+  output logic [1:0]  s_axi_bresp,
+  output logic        s_axi_bvalid,
+  input  logic        s_axi_bready,
 
   // Read address channel
-  input  logic [ADDR_WIDTH-1:0] s_axi_araddr,
-  input  logic [2:0]            s_axi_arprot,   // unused
-  input  logic                  s_axi_arvalid,
-  output logic                  s_axi_arready,
+  input  logic [5:0]  s_axi_araddr,
+  input  logic [2:0]  s_axi_arprot,  // unused
+  input  logic        s_axi_arvalid,
+  output logic        s_axi_arready,
 
   // Read data channel
-  output logic [31:0]           s_axi_rdata,
-  output logic [1:0]            s_axi_rresp,
-  output logic                  s_axi_rvalid,
-  input  logic                  s_axi_rready,
+  output logic [31:0] s_axi_rdata,
+  output logic [1:0]  s_axi_rresp,
+  output logic        s_axi_rvalid,
+  input  logic        s_axi_rready,
 
-  output logic                  irq
+  output logic        irq
 );
 
   // Word offsets (byte address >> 2)
@@ -130,15 +128,8 @@ module aes128_axil #(
     return old_val;
   endfunction
 
-  // -------------------------------------------------------------------------
-  // Write channel
-  // -------------------------------------------------------------------------
-
-  logic       wr_en;
-  logic [3:0] wr_word;
-
-  assign wr_en   = s_axi_awvalid && s_axi_awready && s_axi_wvalid && s_axi_wready;
-  assign wr_word = s_axi_awaddr[5:2];
+  logic wr_en;
+  assign wr_en = s_axi_awvalid && s_axi_awready && s_axi_wvalid && s_axi_wready;
 
   // Accept address and data together, then hold BVALID until the master takes
   // the response.
@@ -148,13 +139,8 @@ module aes128_axil #(
       s_axi_wready  <= 1'b0;
       s_axi_bvalid  <= 1'b0;
     end else begin
-      if (!s_axi_awready && s_axi_awvalid && s_axi_wvalid && !s_axi_bvalid) begin
-        s_axi_awready <= 1'b1;
-        s_axi_wready  <= 1'b1;
-      end else begin
-        s_axi_awready <= 1'b0;
-        s_axi_wready  <= 1'b0;
-      end
+      s_axi_awready <= !s_axi_awready && s_axi_awvalid && s_axi_wvalid && !s_axi_bvalid;
+      s_axi_wready  <= !s_axi_awready && s_axi_awvalid && s_axi_wvalid && !s_axi_bvalid;
 
       if (wr_en) begin
         s_axi_bvalid <= 1'b1;
@@ -179,7 +165,7 @@ module aes128_axil #(
       core_clear <= 1'b0;
 
       if (wr_en) begin
-        case (wr_word)
+        case (s_axi_awaddr[5:2])
           REG_CTRL: begin
             if (s_axi_wstrb[0]) begin
               irq_en <= s_axi_wdata[2];
@@ -204,7 +190,7 @@ module aes128_axil #(
           REG_PT2:  pt_reg[63:32]   <= apply_wstrb(pt_reg[63:32],   s_axi_wdata, s_axi_wstrb);
           REG_PT3:  pt_reg[31:0]    <= apply_wstrb(pt_reg[31:0],    s_axi_wdata, s_axi_wstrb);
 
-          default: ;  // read-only or unmapped: ignore
+          default: ;  // read-only or unmapped
         endcase
       end
     end
@@ -222,10 +208,7 @@ module aes128_axil #(
 
   assign irq = done_flag && irq_en;
 
-  // -------------------------------------------------------------------------
-  // Read channel
-  // -------------------------------------------------------------------------
-
+  // Read data. KEY0-KEY3 fall into the default and read as 0.
   logic [31:0] rd_mux;
 
   always_comb begin
@@ -240,21 +223,18 @@ module aes128_axil #(
       REG_CT1:    rd_mux = core_ct[95:64];
       REG_CT2:    rd_mux = core_ct[63:32];
       REG_CT3:    rd_mux = core_ct[31:0];
-      default:    rd_mux = 32'd0;   // includes KEY0..KEY3 (write-only)
+      default:    rd_mux = 32'd0;
     endcase
   end
 
+  // Accept one read address, then hold RVALID until the master takes the data.
   always_ff @(posedge s_axi_aclk) begin
     if (rst) begin
       s_axi_arready <= 1'b0;
       s_axi_rvalid  <= 1'b0;
       s_axi_rdata   <= '0;
     end else begin
-      if (!s_axi_arready && s_axi_arvalid && !s_axi_rvalid) begin
-        s_axi_arready <= 1'b1;
-      end else begin
-        s_axi_arready <= 1'b0;
-      end
+      s_axi_arready <= !s_axi_arready && s_axi_arvalid && !s_axi_rvalid;
 
       if (s_axi_arvalid && s_axi_arready) begin
         s_axi_rvalid <= 1'b1;

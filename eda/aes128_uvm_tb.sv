@@ -28,7 +28,7 @@ package aes_uvm_pkg;
   `include "uvm_macros.svh"
 
   // ------------------------------------------------------------------------
-  // Behavioral AES-128 reference model (scoreboard oracle)
+  // Behavioral AES-128 reference model, the scoreboard oracle.
   // ------------------------------------------------------------------------
   localparam bit [7:0] REF_SBOX [0:255] = '{
     8'h63, 8'h7c, 8'h77, 8'h7b, 8'hf2, 8'h6b, 8'h6f, 8'hc5,
@@ -73,7 +73,7 @@ package aes_uvm_pkg;
     return (b << 1) ^ (b[7] ? 8'h1b : 8'h00);
   endfunction
 
-  // advance rk (16 bytes = 4 words) to the next round key, in place
+  // Advance rk (16 bytes = 4 words) to the next round key, in place.
   function automatic void ref_next_key(ref bit [7:0] rk [0:15], input bit [7:0] rc);
     bit [7:0] t0, t1, t2, t3;
     t0 = REF_SBOX[rk[13]] ^ rc;
@@ -141,7 +141,7 @@ package aes_uvm_pkg;
   endfunction
 
   // ------------------------------------------------------------------------
-  // Transaction
+  // Transaction: one AES block (key, plaintext, observed ciphertext).
   // ------------------------------------------------------------------------
   class aes_seq_item extends uvm_sequence_item;
     rand bit [127:0] key;
@@ -200,7 +200,7 @@ package aes_uvm_pkg;
   endclass : aes_driver
 
   // ------------------------------------------------------------------------
-  // Monitor: at done, samples the inputs and ciphertext into one transaction.
+  // Monitor: at done, samples the inputs and ciphertext into one item.
   // ------------------------------------------------------------------------
   class aes_monitor extends uvm_monitor;
     `uvm_component_utils(aes_monitor)
@@ -269,7 +269,7 @@ package aes_uvm_pkg;
   endclass : aes_scoreboard
 
   // ------------------------------------------------------------------------
-  // Environment
+  // Environment: wires sequencer, driver, monitor, scoreboard together.
   // ------------------------------------------------------------------------
   class aes_env extends uvm_env;
     `uvm_component_utils(aes_env)

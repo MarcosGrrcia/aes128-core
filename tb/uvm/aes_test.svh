@@ -1,4 +1,4 @@
-// Tests: one environment, picked at run time with +UVM_TESTNAME.
+// Tests: one environment, selected at run time with +UVM_TESTNAME.
 class aes_base_test extends uvm_test;
   `uvm_component_utils(aes_base_test)
   aes_env env;

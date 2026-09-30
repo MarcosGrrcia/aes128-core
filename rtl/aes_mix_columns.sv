@@ -13,7 +13,7 @@ module aes_mix_columns (
 
   always_comb begin
     logic [7:0] a0, a1, a2, a3;        // column bytes
-    logic [7:0] x0, x1, x2, x3;        // their xtime() products (computed once)
+    logic [7:0] x0, x1, x2, x3;        // their xtime() products
     for (int col = 0; col < 4; col++) begin
       a0 = state_in[127 - 8*(4*col + 0) -: 8];
       a1 = state_in[127 - 8*(4*col + 1) -: 8];

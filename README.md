@@ -1,14 +1,9 @@
 # AES-128 Core
 
-A synthesizable AES-128 encryption core in SystemVerilog, verified with a
-self-checking testbench, a UVM testbench, and bound SVA assertions. An
-AXI4-Lite wrapper exposes the core as a memory-mapped peripheral, so it can be
-dropped into an FPGA SoC (e.g. a Zynq or MicroBlaze system) and driven from
-software.
-
-The design follows FIPS-197. It encrypts one 128-bit block at a time using an
-iterative datapath: one round per clock cycle, with the round keys generated on
-the fly rather than precomputed and stored.
+A synthesizable AES-128 encryption core in SystemVerilog, following FIPS-197,
+with an AXI4-Lite wrapper so it can sit on a bus as a memory-mapped
+peripheral. Verified with self-checking testbenches, a UVM testbench, and
+bound SVA assertions.
 
 ## Design
 
@@ -48,12 +43,12 @@ ten the state is the ciphertext.
 The core is iterative: there is one round's worth of hardware, and the state
 register goes through it once per clock. A block takes 11 clocks (one to load
 the input and add the first key, then ten rounds) and only one block is in
-flight at a time. We went this way instead of unrolling all ten rounds to keep
-the area down. Control is just a round counter (0 = idle) rather than a
-separate state machine, and the key schedule computes the next round key each
-clock, so round keys are never stored.
+flight at a time. This keeps the area down compared to unrolling all ten
+rounds. Control is a round counter (0 = idle) rather than a separate state
+machine, and the key schedule computes the next round key each clock, so round
+keys are never stored.
 
-Each block transform is its own small module:
+Modules:
 
 | Module            | Function                                               |
 | :---------------- | :----------------------------------------------------- |
@@ -65,7 +60,7 @@ Each block transform is its own small module:
 | `aes_mix_columns` | MixColumns matrix multiply in GF(2^8)                  |
 | `aes_key_expand`  | One step of the key schedule                           |
 
-### Interface
+### Core interface
 
 | Signal       | Dir | Width | Description                                                             |
 | :----------- | :-: | ----: | :---------------------------------------------------------------------- |
@@ -100,8 +95,9 @@ output. Software writes the key and plaintext, sets `START`, waits for `DONE`
 Word 0 of each block is the most significant (`KEY0` = `key[127:96]`), so a
 test vector is written in the same order it's printed. `WSTRB` is honored on
 the key and plaintext registers. `CLEAR` wipes the key and plaintext registers
-as well as the core. Unmapped addresses read as 0, and every response is
-`OKAY`.
+as well as the core. Offsets 0x08 and 0x0C read as 0, and every response is
+`OKAY`. The port decodes a 64-byte window (6 address bits); the interconnect
+decodes the base address.
 
 The slave handles one transaction at a time. On writes it waits until both
 `AWVALID` and `WVALID` are high and accepts them together, which the AXI spec
@@ -135,8 +131,8 @@ docs/     waveform image and UVM-run logs shown in this README
 
 ## Simulating
 
-The self-checking testbench runs the FIPS-197 and SP 800-38A known-answer
-vectors and checks the handshake. With Verilator:
+The core testbench runs the FIPS-197 and SP 800-38A known-answer vectors and
+checks the handshake. With Verilator:
 
 ```sh
 verilator --binary --timing --assert -Wno-fatal -o sim \
@@ -162,8 +158,9 @@ PASS: all checks passed
 
 Adding `--trace` writes `aes128_tb.vcd`, which opens in GTKWave.
 
-The AXI4-Lite testbench reruns the same vectors through the bus and then
-checks the register map and the channel handshakes:
+![Waveform](docs/waveform.png)
+
+The wrapper testbench runs the same way and prints the same kind of report:
 
 ```sh
 verilator --binary --timing --assert -Wno-fatal --Mdir obj_axil -o sim \
@@ -171,39 +168,15 @@ verilator --binary --timing --assert -Wno-fatal --Mdir obj_axil -o sim \
 ./obj_axil/sim
 ```
 
-```text
-AES-128 known-answer vectors over AXI-Lite:
-  ok   FIPS-197 C.1               69c4e0d86a7b0430d8cdb78070b4c55a
-  ...
-Register map:
-  ok   KEY reads as zero          0
-  ok   PT readback                ae2d8a571e03ac9c9eb76fac45af8e51
-  ok   WSTRB partial write        112d8a44
-  ok   unmapped reads zero        0
-  ok   START ignored while busy   69c4e0d86a7b0430d8cdb78070b4c55a
-Interrupt:
-  ...
-Clear:
-  ...
-Handshakes:
-  ok   AWREADY waits for WVALID
-  ok   BVALID held until BREADY
-  ...
-
-PASS: all checks passed
-```
-
-![Waveform](docs/waveform.png)
-
 ## Verification
 
 There are three layers of checking.
 
 **Known-answer tests.** `tb/aes128_tb.sv` (above) runs the FIPS-197 and
-SP 800-38A vectors. We double-checked the expected ciphertexts with OpenSSL.
-`tb/aes128_axil_tb.sv` runs the same vectors through the AXI4-Lite wrapper
-with a small task-based bus master, then tests the register map, `irq`,
-`CLEAR`, and back-pressure on the response channels.
+SP 800-38A vectors, with the expected ciphertexts cross-checked against
+OpenSSL. `tb/aes128_axil_tb.sv` runs the same vectors through the AXI4-Lite
+wrapper with a small task-based bus master, then tests the register map,
+`irq`, `CLEAR`, and back-pressure on the response channels.
 
 **UVM.** `tb/uvm/` has a small UVM environment (driver, monitor, scoreboard,
 sequences), one class per file. `eda/aes128_uvm_tb.sv` is the same thing in a
@@ -221,14 +194,14 @@ DUT against NIST at the same time.
 **Assertions.** `formal/aes128_props.sv` binds SVA properties to the core:
 `done` only after a `start`, `done` is one cycle wide, `ciphertext` only
 changes on `done` or `clear`, and `clear` zeroes the output.
-`formal/aes128_axil_props.sv` does the same for the wrapper's side of the AXI4-Lite
+`formal/aes128_axil_props.sv` checks the wrapper's side of the AXI4-Lite
 protocol: `BVALID`/`RVALID` stay up with stable data until the master accepts
-them, there is no response without a request, and all outputs are low in
-reset. They run during simulation with `--assert`, and are written so they
+them, there is no response without a request, and the handshake outputs drop
+in reset. They run during simulation with `--assert`, and are written so they
 should also work in a formal tool.
 
-Line coverage (Verilator `--coverage-line`) is 100% on the RTL. The only lines
-never hit are the testbench's own failure and timeout branches.
+Line coverage (Verilator `--coverage-line`) over the two self-checking
+testbenches is 100% on the RTL.
 
 To run the UVM tests on EDA Playground, paste `eda/aes128_rtl.sv` into the
 design pane and `eda/aes128_uvm_tb.sv` into the testbench pane, pick a UVM 1.2
@@ -274,8 +247,8 @@ yosys -p "read_verilog build/aes128.v; synth -top aes128_core -flatten; stat"
 With no cell library this is just a generic gate mapping, but it gives a rough
 size: about 10.5K cells and 389 flops (state, key and ciphertext at 128 bits
 each, the 4-bit round counter, and `done`). The longest path is 21 logic
-levels, which is one full round. This only shows the design synthesizes; we
-haven't taken it through place and route.
+levels, which is one full round. This only shows the design synthesizes; it
+hasn't been through place and route.
 
 With `-top aes128_axil` the wrapper comes to about 11.8K cells and 685 flops.
 Most of the extra flops are the 128-bit key and plaintext registers the bus

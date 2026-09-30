@@ -55,7 +55,7 @@ module aes128_axil_props (
     s_axi_awready == s_axi_wready
   );
 
-  // 6. All outputs are low while in reset.
+  // 6. The handshake outputs go low in reset.
   a_reset_outputs: assert property (
     @(posedge s_axi_aclk)
     !s_axi_aresetn |=> !(s_axi_awready || s_axi_wready || s_axi_bvalid ||

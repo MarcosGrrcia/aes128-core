@@ -1,4 +1,4 @@
-// Scoreboard: predicts from the inputs, compares to the DUT.
+// Scoreboard: predicts with the reference model, compares to the DUT.
 class aes_scoreboard extends uvm_scoreboard;
   `uvm_component_utils(aes_scoreboard)
 

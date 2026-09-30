@@ -43,7 +43,7 @@ function automatic bit [7:0] ref_xtime(input bit [7:0] b);
   return (b << 1) ^ (b[7] ? 8'h1b : 8'h00);
 endfunction
 
-// advance rk (16 bytes = 4 words) to the next round key, in place
+// Advance rk (16 bytes = 4 words) to the next round key, in place.
 function automatic void ref_next_key(ref bit [7:0] rk [0:15], input bit [7:0] rc);
   bit [7:0] t0, t1, t2, t3;
   t0 = REF_SBOX[rk[13]] ^ rc;

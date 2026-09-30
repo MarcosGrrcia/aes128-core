@@ -2,7 +2,7 @@
 
 // Self-checking testbench for the AXI4-Lite wrapper (aes128_axil).
 //
-// A simple task-based AXI-Lite master programs the key and plaintext
+// A simple task-based AXI4-Lite master programs the key and plaintext
 // registers, starts the core, polls STATUS and reads the ciphertext back. It
 // reruns the known-answer vectors through the bus, then checks the register
 // map (write-only key, WSTRB, CLEAR, irq) and the channel handshakes.
@@ -13,11 +13,11 @@
 
 module aes128_axil_tb;
 
-  localparam logic [7:0] CTRL   = 8'h00;
-  localparam logic [7:0] STATUS = 8'h04;
-  localparam logic [7:0] KEY0   = 8'h10;
-  localparam logic [7:0] PT0    = 8'h20;
-  localparam logic [7:0] CT0    = 8'h30;
+  localparam logic [5:0] CTRL   = 6'h00;
+  localparam logic [5:0] STATUS = 6'h04;
+  localparam logic [5:0] KEY0   = 6'h10;
+  localparam logic [5:0] PT0    = 6'h20;
+  localparam logic [5:0] CT0    = 6'h30;
 
   localparam logic [31:0] CTRL_START  = 32'h1;
   localparam logic [31:0] CTRL_CLEAR  = 32'h2;
@@ -26,7 +26,7 @@ module aes128_axil_tb;
   logic clk = 1'b0;
   logic rst_n = 1'b0;
 
-  logic [7:0]  awaddr = '0;
+  logic [5:0]  awaddr = '0;
   logic        awvalid = 1'b0;
   logic        awready;
   logic [31:0] wdata = '0;
@@ -36,7 +36,7 @@ module aes128_axil_tb;
   logic [1:0]  bresp;
   logic        bvalid;
   logic        bready = 1'b0;
-  logic [7:0]  araddr = '0;
+  logic [5:0]  araddr = '0;
   logic        arvalid = 1'b0;
   logic        arready;
   logic [31:0] rdata;
@@ -103,11 +103,7 @@ module aes128_axil_tb;
     end
   endtask
 
-  // -------------------------------------------------------------------------
-  // AXI-Lite master
-  // -------------------------------------------------------------------------
-
-  task automatic axi_write(input logic [7:0] addr, input logic [31:0] data,
+  task automatic axi_write(input logic [5:0] addr, input logic [31:0] data,
                            input logic [3:0] strb = 4'hF);
     @(negedge clk);
     awaddr  = addr;
@@ -129,7 +125,7 @@ module aes128_axil_tb;
     bready = 1'b0;
   endtask
 
-  task automatic axi_read(input logic [7:0] addr, output logic [31:0] data);
+  task automatic axi_read(input logic [5:0] addr, output logic [31:0] data);
     @(negedge clk);
     araddr  = addr;
     arvalid = 1'b1;
@@ -147,22 +143,18 @@ module aes128_axil_tb;
     rready = 1'b0;
   endtask
 
-  // -------------------------------------------------------------------------
-  // Register-level helpers
-  // -------------------------------------------------------------------------
-
-  task automatic write_block(input logic [7:0] base, input logic [127:0] val);
-    axi_write(base + 8'h0, val[127:96]);
-    axi_write(base + 8'h4, val[95:64]);
-    axi_write(base + 8'h8, val[63:32]);
-    axi_write(base + 8'hC, val[31:0]);
+  task automatic write_block(input logic [5:0] base, input logic [127:0] val);
+    axi_write(base + 6'h0, val[127:96]);
+    axi_write(base + 6'h4, val[95:64]);
+    axi_write(base + 6'h8, val[63:32]);
+    axi_write(base + 6'hC, val[31:0]);
   endtask
 
-  task automatic read_block(input logic [7:0] base, output logic [127:0] val);
-    axi_read(base + 8'h0, val[127:96]);
-    axi_read(base + 8'h4, val[95:64]);
-    axi_read(base + 8'h8, val[63:32]);
-    axi_read(base + 8'hC, val[31:0]);
+  task automatic read_block(input logic [5:0] base, output logic [127:0] val);
+    axi_read(base + 6'h0, val[127:96]);
+    axi_read(base + 6'h4, val[95:64]);
+    axi_read(base + 6'h8, val[63:32]);
+    axi_read(base + 6'hC, val[31:0]);
   endtask
 
   task automatic wait_done();
@@ -178,10 +170,6 @@ module aes128_axil_tb;
     read_block(CT0, ct);
   endtask
 
-  // -------------------------------------------------------------------------
-  // Tests
-  // -------------------------------------------------------------------------
-
   logic [127:0] ct, blk;
   logic [31:0]  word;
 
@@ -192,7 +180,7 @@ module aes128_axil_tb;
     repeat (3) @(negedge clk);
     rst_n = 1'b1;
 
-    $display("AES-128 known-answer vectors over AXI-Lite:");
+    $display("AES-128 known-answer vectors over AXI4-Lite:");
     encrypt(128'h000102030405060708090a0b0c0d0e0f,
             128'h00112233445566778899aabbccddeeff, ct);
     check("FIPS-197 C.1", ct, 128'h69c4e0d86a7b0430d8cdb78070b4c55a);
@@ -227,8 +215,17 @@ module aes128_axil_tb;
     axi_read(PT0, word);
     check32("WSTRB partial write", word, 32'h112d8a44);
 
-    axi_read(8'h08, word);
+    axi_read(6'h08, word);
     check32("unmapped reads zero", word, 32'd0);
+
+    axi_write(CT0, 32'hdeadbeef);
+    axi_read(CT0, word);
+    check32("CT is read-only", word, 32'hf5d3d585);
+
+    // A CTRL write without WSTRB[0] doesn't reach the START bit.
+    axi_write(CTRL, CTRL_START, 4'b1110);
+    axi_read(STATUS, word);
+    check32("CTRL needs WSTRB[0]", word, 32'h2);
 
     // Writing START while busy must not restart the block. Each write takes
     // about four clocks, so the second START lands well inside the 11-clock
