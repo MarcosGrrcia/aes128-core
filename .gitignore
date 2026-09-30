@@ -1,5 +1,6 @@
 # Simulator / synthesis build artifacts
 obj_dir/
+obj_axil/
 work/
 build/
 *.vcd

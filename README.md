@@ -1,7 +1,10 @@
 # AES-128 Core
 
 A synthesizable AES-128 encryption core in SystemVerilog, verified with a
-self-checking testbench, a UVM testbench, and bound SVA assertions.
+self-checking testbench, a UVM testbench, and bound SVA assertions. An
+AXI4-Lite wrapper exposes the core as a memory-mapped peripheral, so it can be
+dropped into an FPGA SoC (e.g. a Zynq or MicroBlaze system) and driven from
+software.
 
 The design follows FIPS-197. It encrypts one 128-bit block at a time using an
 iterative datapath: one round per clock cycle, with the round keys generated on
@@ -54,7 +57,8 @@ Each block transform is its own small module:
 
 | Module            | Function                                               |
 | :---------------- | :----------------------------------------------------- |
-| `aes128_core`     | Top level: round counter, registers, handshake         |
+| `aes128_axil`     | AXI4-Lite slave wrapper: register map, irq             |
+| `aes128_core`     | Cipher core: round counter, registers, handshake       |
 | `aes_sbox`        | One-byte S-box (used by SubBytes and the key schedule) |
 | `aes_sub_bytes`   | SubBytes over all 16 bytes                             |
 | `aes_shift_rows`  | ShiftRows byte permutation                             |
@@ -77,15 +81,55 @@ Each block transform is its own small module:
 
 Bytes are big-endian: `plaintext[127:120]` is byte 0 of the state.
 
+### AXI4-Lite wrapper
+
+`aes128_axil` puts the core behind a standard 32-bit AXI4-Lite slave port
+(Xilinx-style `s_axi_*` names, active-low `s_axi_aresetn`), plus an `irq`
+output. Software writes the key and plaintext, sets `START`, waits for `DONE`
+(by polling or by interrupt), then reads the ciphertext.
+
+| Offset      | Name     | Access | Description                                                       |
+| :---------- | :------- | :----: | :---------------------------------------------------------------- |
+| 0x00        | `CTRL`   |   W    | [0] `START` (ignored while busy), [1] `CLEAR`, both self-clearing |
+|             |          |   RW   | [2] `IRQ_EN`: drive `irq` while `DONE` is set                     |
+| 0x04        | `STATUS` |   R    | [0] `BUSY`, [1] `DONE` (cleared by the next `START` or `CLEAR`)   |
+| 0x10 - 0x1C | `KEY0-3` |   W    | Key, write-only (reads return 0)                                  |
+| 0x20 - 0x2C | `PT0-3`  |   RW   | Plaintext                                                         |
+| 0x30 - 0x3C | `CT0-3`  |   R    | Ciphertext                                                        |
+
+Word 0 of each block is the most significant (`KEY0` = `key[127:96]`), so a
+test vector is written in the same order it's printed. `WSTRB` is honored on
+the key and plaintext registers. `CLEAR` wipes the key and plaintext registers
+as well as the core. Unmapped addresses read as 0, and every response is
+`OKAY`.
+
+The slave handles one transaction at a time. On writes it waits until both
+`AWVALID` and `WVALID` are high and accepts them together, which the AXI spec
+allows and keeps the logic small. A typical driver:
+
+```c
+for (int i = 0; i < 4; i++) {
+    AES->KEY[i] = key[i];
+    AES->PT[i]  = pt[i];
+}
+AES->CTRL = AES_CTRL_START;
+while (!(AES->STATUS & AES_STATUS_DONE))
+    ;
+for (int i = 0; i < 4; i++)
+    ct[i] = AES->CT[i];
+```
+
 ## Layout
 
 ```text
-rtl/      RTL modules (aes128_core + transforms)
-tb/       aes128_tb.sv      self-checking testbench, no UVM
-          uvm/              UVM env, one class per file
-eda/      aes128_rtl.sv     all RTL in one file (EDA Playground design pane)
-          aes128_uvm_tb.sv  UVM env in one file (EDA Playground testbench pane)
-formal/   aes128_props.sv   SVA assertions, bound to the core
+rtl/      RTL modules (aes128_axil wrapper, aes128_core + transforms)
+tb/       aes128_tb.sv          self-checking testbench for the core, no UVM
+          aes128_axil_tb.sv     self-checking testbench for the AXI4-Lite wrapper
+          uvm/                  UVM env, one class per file
+eda/      aes128_rtl.sv         all RTL in one file (EDA Playground design pane)
+          aes128_uvm_tb.sv      UVM env in one file (EDA Playground testbench pane)
+formal/   aes128_props.sv       SVA assertions, bound to the core
+          aes128_axil_props.sv  AXI4-Lite protocol assertions, bound to the wrapper
 docs/     waveform image and UVM-run logs shown in this README
 ```
 
@@ -96,7 +140,7 @@ vectors and checks the handshake. With Verilator:
 
 ```sh
 verilator --binary --timing --assert -Wno-fatal -o sim \
-  rtl/*.sv formal/aes128_props.sv tb/aes128_tb.sv --top-module aes128_tb
+  rtl/*.sv formal/*.sv tb/aes128_tb.sv --top-module aes128_tb
 ./obj_dir/sim
 ```
 
@@ -118,6 +162,37 @@ PASS: all checks passed
 
 Adding `--trace` writes `aes128_tb.vcd`, which opens in GTKWave.
 
+The AXI4-Lite testbench reruns the same vectors through the bus and then
+checks the register map and the channel handshakes:
+
+```sh
+verilator --binary --timing --assert -Wno-fatal --Mdir obj_axil -o sim \
+  rtl/*.sv formal/*.sv tb/aes128_axil_tb.sv --top-module aes128_axil_tb
+./obj_axil/sim
+```
+
+```text
+AES-128 known-answer vectors over AXI-Lite:
+  ok   FIPS-197 C.1               69c4e0d86a7b0430d8cdb78070b4c55a
+  ...
+Register map:
+  ok   KEY reads as zero          0
+  ok   PT readback                ae2d8a571e03ac9c9eb76fac45af8e51
+  ok   WSTRB partial write        112d8a44
+  ok   unmapped reads zero        0
+  ok   START ignored while busy   69c4e0d86a7b0430d8cdb78070b4c55a
+Interrupt:
+  ...
+Clear:
+  ...
+Handshakes:
+  ok   AWREADY waits for WVALID
+  ok   BVALID held until BREADY
+  ...
+
+PASS: all checks passed
+```
+
 ![Waveform](docs/waveform.png)
 
 ## Verification
@@ -126,6 +201,9 @@ There are three layers of checking.
 
 **Known-answer tests.** `tb/aes128_tb.sv` (above) runs the FIPS-197 and
 SP 800-38A vectors. We double-checked the expected ciphertexts with OpenSSL.
+`tb/aes128_axil_tb.sv` runs the same vectors through the AXI4-Lite wrapper
+with a small task-based bus master, then tests the register map, `irq`,
+`CLEAR`, and back-pressure on the response channels.
 
 **UVM.** `tb/uvm/` has a small UVM environment (driver, monitor, scoreboard,
 sequences), one class per file. `eda/aes128_uvm_tb.sv` is the same thing in a
@@ -142,9 +220,12 @@ DUT against NIST at the same time.
 
 **Assertions.** `formal/aes128_props.sv` binds SVA properties to the core:
 `done` only after a `start`, `done` is one cycle wide, `ciphertext` only
-changes on `done` or `clear`, and `clear` zeroes the output. They run during
-simulation with `--assert`, and are written so they should also work in a
-formal tool.
+changes on `done` or `clear`, and `clear` zeroes the output.
+`formal/aes128_axil_props.sv` does the same for the wrapper's side of the AXI4-Lite
+protocol: `BVALID`/`RVALID` stay up with stable data until the master accepts
+them, there is no response without a request, and all outputs are low in
+reset. They run during simulation with `--assert`, and are written so they
+should also work in a formal tool.
 
 Line coverage (Verilator `--coverage-line`) is 100% on the RTL. The only lines
 never hit are the testbench's own failure and timeout branches.
@@ -195,6 +276,11 @@ size: about 10.5K cells and 389 flops (state, key and ciphertext at 128 bits
 each, the 4-bit round counter, and `done`). The longest path is 21 logic
 levels, which is one full round. This only shows the design synthesizes; we
 haven't taken it through place and route.
+
+With `-top aes128_axil` the wrapper comes to about 11.8K cells and 685 flops.
+Most of the extra flops are the 128-bit key and plaintext registers the bus
+writes into. The longest path is still the 21-level round, so the bus logic
+doesn't limit the clock.
 
 ## Limitations
 
